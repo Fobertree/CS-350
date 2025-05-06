@@ -1,0 +1,433 @@
+\subsection{The Environment}
+Three ways parameters can be given to a process
+\begin{itemize}
+    \item Explicit parameter
+    \begin{itemize}
+        \item By command line ``argv"
+        \item At run time by system call (e.g. read)
+    \end{itemize}
+    \item Implicit parameter
+    \begin{itemize}
+        \item Parameters that are common to multiple programs, Eg:
+        \begin{itemize}
+            \item What Language to use in messages
+            \item An Organization string
+            \item Terminal type
+        \end{itemize}
+    \end{itemize}
+    \item These parameters are passed as part of the ``ENVIRONMENT"
+    \item The ENVIRONMENT is a set of KEY=VALUE pairs. Egs:
+    \begin{itemize}
+        \item LANG=en\_US.UTF-8 TERM=xterm-256color
+    \end{itemize}
+\end{itemize}
+The environment is passed to process by additional argument to main
+\begin{itemize}
+    \item int main(int argc, char *argv[], char *envp[])
+    \begin{itemize}
+        \item envp is a vector of KEY=VALUE strings
+        \item Unlike argv there is no count, the vector is null terminated
+        \item **envp, like **argv as arguments to main, are really pointers to vectors of strings that the OS has passed on the initial stack when main executes
+    \end{itemize}
+    \item A program can just loop through the envp vector looking for any keys it is interested in
+    \item The environment is also passed in a global variable ENVIRON
+    \item There are library routines that can search for keys, and add to the environment
+    \begin{itemize}
+        \item getenv, putenv, setenv, unsetenv
+    \end{itemize}
+\end{itemize}
+\subsection{The Shell and the Environment}
+\begin{itemize}
+    \item The shell interacts with the ENVIRONMENT, treating KEYS as variables that it can set and examine
+    \item Putting a \$ ahead of a KEY retrieves its value
+    \begin{itemize}
+        \item echo \$TERM
+        \begin{itemize}
+            \item Would first retrieve value of TERM replace \$TERM with that value and THEN execute the echo program
+        \end{itemize}
+    \end{itemize}
+    \item Setting a variable is just using the = sign
+    \begin{itemize}
+        \item LANG=en\_CA.UTF-8
+    \end{itemize}
+    \item Children inherit original variables unless exported (can export by piping e.g. export TODAY, where TODAY is an environment variable)
+    \item Shell scripts can write programs with these variables. Ex:
+    \begin{itemize}
+        \item \% x=0; for i in 1 2 3; do let x = \$x + \$i; done; echo \$x
+        \item Prints 6 (sum of 1,2,3)
+    \end{itemize}
+\end{itemize}
+.prenv | grep DISPLAY
+\subsection{The Fork System Call}
+\begin{itemize}
+    \item int fork()
+    \begin{itemize}
+        \item It does this by creating a child process that is a duplicate of itself
+        \item The new process has
+        \begin{itemize}
+            \item Same TEXT, Data, BSS, Heap, Stack at the time of fork (picture of parent at time of fork)
+            \item The return value from fork (which is on the stacks, recall return value of any function is pushed onto the stack) differ
+            \item The UBLOCKS are also the same except for PID, PPID, time used
+            \begin{itemize}
+                \item NB CWD, tty, file descriptor table are not changed
+            \end{itemize}
+        \end{itemize}
+    \end{itemize}
+    \item Clone is a more recent addition, which is a granular version of fork which can control which segments are copied
+\end{itemize}
+Using fork
+\begin{itemize}
+    \item Different return values of fork is what makes it possible
+    \begin{itemize}
+        \item if (!fork()): child code
+        \item Else: parent code
+    \end{itemize}
+\end{itemize}
+wait and exit
+\begin{itemize}
+    \item A process creating a child with fork is responsible for dealing with teh child's ultimate completion
+    \item A process can terminate two ways
+    \begin{itemize}
+        \item Normal termination, via return from main, or exit system call. Either way a value is returned to parent
+        \item Abnormal termination, process dies on a signal, e.g. segfault, floating point error, invalid opcode, etc. Signal number for each of these. These are commonly associated with signals
+    \end{itemize}
+    \item pid\_t wait(int *wstatus)
+    \begin{itemize}
+        \item A parent issuing this syscall blocks until the child terminates. The return value is the childs pid. wstatus gives the cause of termination
+        \item Macros: WIFEXITED(wstatus), WEXITSTATUS(wstatus)
+        \item Macros for abnormal (paired with signals, something went wrong): WIFSIGNALED(wstatus), WTERMSIG(wstatus)
+    \end{itemize}
+    \item If parent process doesn't wait on child processes, the child processes become zombies. A dead child not waited for is a Zombie and holds resources
+    \begin{itemize}
+        \item Bad, because we can end up with too many processes (could crash, fill up kernel process table)
+        \item When a parent process dies before child, child processes is inherited by process init (pid 1), which then waits the child
+    \end{itemize}
+\end{itemize}
+The Exec* System Call
+\begin{itemize}
+    \item Fork only gets you as far as creating a child process that runs the same program as the parent, although perhaps different parts of the program
+    \item The exec* system call is used to change the program a process is running
+    \item int execl (const char *path, const char *arg1, ..., *argn, NULL)
+    \begin{itemize}
+        \item l means list
+        \item Path is always the first parameter, and is the path of the program we want to run
+        \item The process issuing this system call keeps its current UBLOCK, including its PID, UIC, CWD, file descriptor table, etc. (signal table changes)
+        \item Program with text, data, bss, heap, UBLOCK. We have an exec in text segment
+        \item Exec forces us into OS, looks at how much address space we need in the new program
+        \item Exec then throws away everything EXCEPT for the UBLOCK. The text segment now contains a main which starts running
+        \item This does the opposite of fork: fork makes copy and runs it in parallel. Exec takes process currently running and changes it to a different program
+        \item Still shares the same PID, file descriptor table, CWD (all the system stuff is the same as per the UBLOCK)
+    \end{itemize}
+    \item execl is the version of exec where the new arguments are specifically compiled in to the source code
+    \item Variations are exec l, lp, le, v, ve, vpe (6 variations)
+    \begin{itemize}
+        \item Those with an `l' like execl have the args list compiled in
+        \item This with a `v' have a char * argv[] which can be constructed at run time
+        \item Those with an `e' have a char *envp\{\} argument for a new environment constructed at run time. Otheriwse the parents environment is copied
+        \item Those with a ``p" will search \$PATH if there is no ``/" in the path specified
+    \end{itemize}
+\end{itemize}
+Exec and Fork together
+\begin{itemize}
+    \item Ex: gcc does this (sharp includes, parsing, code generation). Gcc is one process exacting one phase/program one after the other
+    \item Ex of how shell implement command line ``\% wc myfile $>$ count". Note: wc is word count
+    \begin{itemize}
+        \item Shell creates child to run the program (fork + execlp)
+        \item For child, close(1) to dissociate from terminal via stdout (since we only run this for the child process, stdout isn't closed for the parent), then creat(``count", 0666), then exec
+        \item else, wait(\&status), then continue executing code or exit(0)
+    \end{itemize}
+    \item Demos: fork-exec.c spawn.c
+    \item NEVER, EVER WRITE CODE AFTER EXEC UNLESS ITS TO HANDLE FAILURE (perror + exit with error code).
+    \begin{itemize}
+        \item EXEC WIPES THE TEXT SEGMENT AND REPLACES IT. ONLY PERROR(``execle")
+    \end{itemize}
+\end{itemize}
+
+\subsection{Pipes}
+How do we get multiple processes to communicate/exchange information in order to collaborate? IPC (interprocess communication)
+\begin{itemize}
+    \item int pipe(int pipefd[2]);
+    \begin{itemize}
+        \item Creates a Pipe, with two file descriptor ends pipefd[0] and pipefd[1]
+        \item pipefd[0] is read only, pipefd[1] is write only
+        \item Everything written to pipefd[1] can be read back from pipefd[0] in FIFO order
+        \item Most naive example (pipe of process to itself. This is useless IRL): In a process, pipefd[0] connected to UBLOCK, data segment connected to pipefd[1]
+        \begin{itemize}
+            \item Only value is in forking. The child shares the same file descriptors as the parent, so it has the two ends of the same pipe
+            \item Recall, fork copies UBLOCK, so file descriptor tables are copied
+            \item Everything you write into parent process, the child process can read (close read end on parent process, write end on child process. This enables IPC). Vice-versa also works
+            \item To be useful the processes must close the end of the pipe they are not using, so that there is only a reading end in one and a writing end in the other. If extra writing ends are open, the reading end will never get EOF (when writing end closes, we can ensure reading end gets EOF)
+            \item Exec also preserves file descriptors, so the pipe stays in place even after the child ``execs" a new program. The dup2 system call is necessary for this to be useful
+            \item Bidirectional communication needs two pipes
+        \end{itemize}
+        \item Size of a pipe is limited. Traditionally 4K, but as hardware has improved Linux uses 16 times memory page size. On 64 bit Linux, the pagesize is 4K, so default pipe capacity is 64K
+    \end{itemize}
+    \item Default Blocking Behavior
+    \begin{itemize}
+        \item Writes that would exceed the space left in a pipe block. It wouldn't succeed in pushing data to the pipe, but it would block until there is sufficient space in the block
+        \item Reads from a non-empty pipe return MIN(request, avail)
+        \item Read from an empty pipe blocks (until there is data in the read)
+    \end{itemize}
+\end{itemize}
+Non Default Blocking Behavior
+\begin{itemize}
+    \item Although the default blocking behavior is perfect in most cases, there are times when either the consumer or producer can do something useful during the time it would block
+    \item The blocking behavior can be changed by changing the open fag with fcntl. (We saw fcntl earlier with O\_SYNC for synchronized I/O)
+    \begin{itemize}
+        \item Stop default blocking in pipe: fcntl(fd[0], F\_SETFL, O\_NON\_BLOCKED)
+    \end{itemize}
+    \item With NON Blocking
+    \begin{itemize}
+        \item If no blocking, returns value 0 (EOF). Return value of 0 means there is no way to sense a real EOF, i.e. write side being closed
+        \item Writes that request more space than is available return with -1
+    \end{itemize}
+    \item Remember, with default blocking behavior, we only get EOF after write closed (fd[1])
+\end{itemize}
+Pipe with fork exec
+\begin{itemize}
+    \item See above: close the end of each pipe you aren't using for proper unidirectional piping under fork
+\end{itemize}
+Code for parent to child with exec: Renumbering file descriptors
+\begin{itemize}
+    \item int dup2(int oldfd, int newfd)
+    \begin{itemize}
+        \item The dup2 system call allows you to renumber file descriptors (really duplicates and renames it). In particular a pipe fd can be renumbered to 0 or 1, One normally would close [oldfd] after the dup
+        \item Normally you won't want two fds pointing to same thing, so close the old one (basically becomes a renumber)
+    \end{itemize}
+\end{itemize}
+Siblings with Pipe
+\begin{itemize}
+    \item This is the effect of what the shell does for ``ls | wc"
+    \item Parent creates pipes, forks twice (each child process calls dup2 to duplicate file descriptor for pipe, then closes end it doesn't need). Parent closes both ends of pipe via close syscall, then wait on status for both child processes
+    \item Random note: If the command had been ``ls | wc \&" the shell would not have issued the last two waits and would immediately prompt for next command
+\end{itemize}
+Consumer Producer and Pipes
+\begin{itemize}
+    \item The default blocking behavior is perfect for producer consumer problems
+    \begin{itemize}
+        \item ``Producer | Consumer"
+    \end{itemize}
+    \item The blocking behavior handles a mismatch in speed
+    \begin{itemize}
+        \item The producer and consumer don't have to know each either. We just know that the pipe ensures that the speed is matched
+        \item If the producer produces too fast it fills the pipe and blocks until the consumer catches up
+        \item If the consumer consumes too fast it blocks on an empty pipe until the producer catches up
+        \item Basically, if one goes too fast, system resources go to the one that is too slow/needs help
+    \end{itemize}
+    \item Pipes do this synchronization without code in the processes or even knowledge that it is happening...
+\end{itemize}
+\subsection{Fifos (named pipes)}
+\begin{itemize}
+    \item A fifo is another file type. It can be created with 
+    \begin{itemize}
+        \item int mkfifo(const char *pathname, mode\_t mode)
+    \end{itemize}
+    \item The pipe system call creates the ends of a pipe that can only be passed by inheritance to their descendants
+    \item Fifos allow \textbf{unrelated processes} to communicate through ``pipe" by getting the endpoints from a fifo (which lives in the filesystem, has a path, inode, permissions, owner, etc).
+    \begin{itemize}
+        \item Opening a fifo O\_RDONLY gets the read fd
+        \item Opening a fifo O\_WRONLY gets a write fd
+        \item Fifo created by mkfifo(path, mode), where path represents path named pipe is stored (note, a fifo is a file in the file system of type fifo)
+        \item EEXIST: already fifo exists at path, can use the fifo
+        \item ENXIO: no other open end
+    \end{itemize}
+    \item The default behavior is for the fifo to block until both sides are open. Open with O\_NONBLOCK lets the read side succeed before the write side. O\_NONBLOCK gives an error if the write side uses it before the read side is open (if it write it without anything on the other side the data is just being thrown away)
+    \item Once both ends are open, it works just like a normal pipe (just added issue of blocking)
+    \item Once open, the blocking is the same for pipes
+    \item Relevant demo: johnfi.c, maryfo.c
+    \item If we set up nonblocking, and we only have write (no read), we have an error. However, if we only have read (no write), no error - instead, we don't get anything
+    \item For reading, therefore, we need to turn off non-blocking (fcntl with F\_SETFL) in order for read to terminate on empty input
+    \item Purpose of nonblock, don't have to wait for other side. Can do some work then try again
+    \item p represents type pipe for named pipes in  ls -l
+\end{itemize}
+\subsection{Message Queues}
+Message Queues
+\begin{itemize}
+    \item Until now, all IPC has been stream oriented
+    \begin{itemize}
+        \item Files, Pipes, and Fifos don't have any inherent record structure
+        \item There is a need for a form of IPC that is more natural for transaction or record processing (not just some sequence, but a certain number of bytes)
+    \end{itemize}
+    \item The IPC mechanisms so far are mainly one-to-one (between processes). A single process sending data to another process. There is a need for many-to-one (one-to-many, etc.) as in many clients of one server
+    \item The idea here is establish a message queue to which
+    \begin{itemize}
+        \item Any client with the right permission can add or retrieve messages
+        \item Each message is really a record with a specified ``type"
+        \begin{itemize}
+            \item Ex: Bank has deposits and withdrawals (2 types)
+        \end{itemize}
+        \item Can add or retrieve by type
+    \end{itemize}
+\end{itemize}
+Creating the Queue
+\begin{itemize}
+    \item First step: establish the message Queue
+    \item In the next several IPC mechanisms there is a pattern for how the API starts
+    \begin{itemize}
+        \item int XXXget(key\_t key, ..., XXXflg);
+        \item In this case XXX is msg
+        \begin{itemize}
+            \item int msgget(key\_t key, int msgflg)
+        \end{itemize}
+    \end{itemize}
+    \item The key is a integer that is the external identifier of the Queue (it plays the role of a file name)
+    \item The flg is the permission bits optionally OR'd with IPC\_CREATE (indicating that the Queue should be created if it doesn't exist. IPC\_CREATE is a flag macro
+    \begin{itemize}
+        \item Either way the return value is a msgqid, that plays the same role as a file descriptor does for operating on a file
+    \end{itemize}
+    \item int msgctl(int msqid, int cmd, struct msqid\_ds *buf);
+    \begin{itemize}
+        \item Commands IPC\_RMID, IPC\_STAT, IPC\_SET
+    \end{itemize}
+\end{itemize}
+Send and Receive
+\begin{itemize}
+    \item int msgsnd(int msqid, const void *msgp, size\_t msgsz, int msgflg);
+    \item ssize\_t msgrcv(int msqid, void *msgp, size\_ msgsz, long msgtyp, int msgflg);
+    \begin{itemize}
+        \item One additional argument: msgtyp
+        \item msqp points to a buffer that starts with a positive integer ``long" the ``type" of the message
+        \item The type is followed by the message content, its size given by msgsz
+        \item Usually the buffer is implemented as a structure, with the type as the first field and additional fields describing the content
+    \end{itemize}
+    \item On msgrcv msgtyp specifies which message type to receive
+    \begin{itemize}
+        \item 0 means any type is ok, A negative number ``x" means any type $\leq |x|$
+    \end{itemize}
+    \item A msgflg of IPC\_NOWAIT turns off blocking (and return error if the process would have blocked)
+    \begin{itemize}
+        \item Normally, otherwise, if we request a message with message type that is empty/doesn't exist, it blocks until a message appears with the requested type
+        \item Add this flag if we don't want it to block, and we are fine with reissuing later
+        \item See demo johnmess/marymess
+    \end{itemize}
+    \item key\_t is a long int
+    \item Sentinel (messages): terminating message with data that indicates we should stop
+    \begin{itemize}
+        \item On the reading end, the while loop should check this data and break upon receiving this message (e.g. -1)
+    \end{itemize}
+\end{itemize}
+Note: ipcs in shell shows us all the IPC mechanisms with keys (message queues, shared memory segments, semaphore arrays)
+\subsection{Logical Memory: Interlude before next IPC Mechanism (Shared Memory)}
+Physical Memory is divided up into Physical pages of fixed size
+\begin{itemize}
+    \item Linux uses 4K sized pages. A machine with 8GB of ram would have about 2 Million pages (really $2K^2$)
+    \item You can think of a memory address as a pair (P,D) where P is a page number and D is the displacement from the beginning of the page
+    \begin{itemize}
+        \item In our ex: P would be a number between 0 and 2 Million
+        \item D would be a number between 0 and 4095
+    \end{itemize}
+    \item CPU deals in memory addresses. Logical addresses deal in physical addresses
+\end{itemize}
+Bus
+\begin{itemize}
+    \item Address wire, data wire, control wire
+    \item Ex: CPU wants to write, writes address to address bus, data to data bus, write signal to control bus
+    \begin{itemize}
+        \item On reaching memory card, it processes the data. If the address is on the memory card, then it takes data from the buses and stores it in the right address
+        \item Else: buses move on to next memory card
+    \end{itemize}
+    \item For read, bus fetches data from memory card
+    \item MMU: processes logical address pair (P,D) (used by processes) into physical addresses (actual memory locations). P (logical pages) are mapped onto physical pages(Q) via page table
+    \begin{itemize}
+        \item Uses the P (logical address) to look at page table, which has a Q (physical address), creating a new physical address pair (Q,D), which is stored in physical memory (creates new physical address pair)
+        \item Note: logical addresses is not virtual memory address (it requires another dimension: disk address)
+        \item Converts logical address (P, D) to physical address (Q, D)
+    \end{itemize}
+\end{itemize}
+MMU (memory management unit)
+\begin{itemize}
+    \item Each process has its own page table. The OS can assign physical page numbers to a process page table that are not in any other process page table
+    \begin{itemize}
+        \item This is how the hardware ensures that each process has a disjoint address space from every other process
+        \item This allows different processes to use the same logical addresses without conflict
+    \end{itemize}
+    \item The OS can also selectively put the same physical page number in more than one process page table
+    \begin{itemize}
+        \item Two processes running the same program need only one copy of text. In other words, they access the same text by looking at the same page table
+        \item Allows for shared libraries, for example libc.so
+        \item Makes fork efficient
+        \begin{itemize}
+            \item Creates another process with the same page table as the original
+            \item Doesn't actually copy everything (parent and child are temporarily using the same page table)
+            \item More efficient especially when fork and child execs, because it would waste so much time to copy all the text only to fully overwrite it
+        \end{itemize}
+        \item Allows IPC of shared memory
+    \end{itemize}
+\end{itemize}
+\subsection{Shared Memory}
+\begin{itemize}
+    \item All the IPC until now require two system calls to move data from one process to another (write/read, msgsend/msgrcv)
+    \begin{itemize}
+        \item Works well on producer/consumer problems, but NOT well where two processes working on same data concurrently (can't move thing back and forth, for example graphics)
+    \end{itemize}
+    \item A shared memory segment is a set of contiguous physical pages. For technical reasons there are limits to how large and how many shared memory segments there can be (is capped. Has to be in real live memory. Virtual memory can be in physical memory or disk drive, but shared memory has to be in live memory)
+\end{itemize}
+Shared Memory API
+\begin{itemize}
+    \item int shmget(key\_t key, size\_t size, int shmflg);
+    \begin{itemize}
+        \item Returns the shared memory id (shmid) of a shared memory segment with the given key
+        \item Internally characterized by shmid, externally characterized by key
+        \item If it doesn't exist and shmflg includes IPC\_CREAT, it will create the segment of the size specified
+        \item Find pages in memory
+    \end{itemize}
+    \item void *shmat(int shmid const void *shmaddr, int shmflg)
+    \begin{itemize}
+        \item Takes pages, and sticks them in process address space. Program references pages in the address space the pages are mapped to
+        \item Maps the shared memory segment with segid into the current processes logical address space at shmaddr (so shmaddr is where pages get mapped to)
+        \begin{itemize}
+            \item Return value of shmat is the logical address of where the shared memory is put. If shmaddr is 0, then maps to any address
+        \end{itemize}
+        \item \textbf{Shmat loads page numbers into page table}
+        \item Shmflg options are SHM\_RDONLY and SHM\_EXEC
+    \end{itemize}
+    \item int shmdt(const void *shmaddr)
+    \begin{itemize}
+        \item Takes pages put into page table and removes them. Breaks page table connection to shared memory. The shared memory itself doesn't go away (it was already allocated by shmget, and another process and schat into it)
+        \item Detaches the shared memory segment currently mapped a shmaddr
+    \end{itemize}
+    \item int shmctl(int shmid, int cmd, struct shmid\_ds *buf);
+    \begin{itemize}
+        \item The shmid data structure has a set of parameters and stats about the shared memory segment
+        \begin{itemize}
+            \item Perms, number of procs attached, pid of last attach, segsize, owner, etc.
+        \end{itemize}
+        \item Commands: IPC\_RMID, IPC\_STAT, IPC\_SET
+        \item IPC\_RMID is NECESSARY TO DEALLOCATE THE PAGE DATA ITSELF. shmdt ONLY severs the connection, meaning pages are allocated until reboot otherwise
+    \end{itemize}
+    \item johnshare/maryshare demo
+\end{itemize}
+Note: shmid and msqid are global (don't even need a shmget)
+\begin{itemize}
+    \item The key is local (located in process fd table)
+\end{itemize}
+Another note: pipe takes care of synchronization
+\begin{itemize}
+    \item Shared memory is non-blocking
+\end{itemize}
+Problem with Shared Resources
+\begin{itemize}
+    \item Shared memory is just one example of a resource shared by multiple processes. In practice there are many such resources
+    \begin{itemize}
+        \item Files, Devices (printers, scanners, tape drives, etc.)
+    \end{itemize}
+    \item Often its required that the shared resource be used exclusively by one process at a time
+    \begin{itemize}
+        \item Ex: printer, or a data structure in shared memory being updated
+    \end{itemize}
+    \item Somewhat primitive idea: ``lockfile". File contains a 0, when resource is available, and a 1 when its not
+    \begin{itemize}
+        \item This sucks because we stick a syscall inside a while loop
+        \item We can sleep, but this increases latency which also sucks
+        \item This doesn't work. Because on unlock, two processes can try to acquire the lock
+        \item ``testing" (if condition check) and ``setting" the lock is NOT atomic
+        \item In more detail: One process can read a 0 from the lockfile and lose its timeslice, before it could update the lockfile. Then another processes could come in and read the same 0
+        \item Another solution: use the existence of the lockfile to mean the resource is unavailable
+        \begin{itemize}
+            \item Create a file with 0 permission (0 rwx). If creat finds a file, it truncates it. However this returns -1 (error) because truncate requires write permissions. Systemcalls are atomic. OS doesn't start new syscall until previous one is completed.
+            \item while(creat(``lockfile", 0) == -1) seelp(1);
+            \item When done, unlink(``lockfile");. This actually works
+            \item This works, but still not a good solution. Big latency and annoyingly introduces a parameter that must be hard-coded
+        \end{itemize}
+    \end{itemize}
+\end{itemize}

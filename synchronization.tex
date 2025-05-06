@@ -1,0 +1,303 @@
+\subsection{Classical Semaphores}
+\begin{itemize}
+    \item Invented by Dijkstra
+    \item A semaphore S is a variable that can only be updated by two atomic operators P and V (named for Passeren, lock, and Verhogen, unlock)
+    \item A semaphore reflects the number of resources available
+    \begin{itemize}
+        \item P(S) \{ if (--S $<$ 0) blocks the calling process
+        \begin{itemize}
+            \item If $S\leq 0$: block, wait until resource becomes available via V(S)
+            \item So if S is negative, it means members are waiting for access
+        \end{itemize}
+        \item V(S) \{ if S++ < 0) wake up a blocked process
+        \begin{itemize}
+            \item Unblock one of the waiting member, wake up blocked process
+        \end{itemize}
+        \item Think of S as initially number of available resources (S=1 for binary semaphore, just one resource)
+        \begin{itemize}
+            \item When $S\geq 0$ tells how many resources left
+            \item When $S < 0$ all resources are in use and $|S|$ are waiting
+        \end{itemize}
+        \item Usage: P(S): secure + wait resource. V(S): consume + release resource
+    \end{itemize}
+\end{itemize}
+Deadlock
+\begin{itemize}
+    \item Common problem with classical semaphores when two of them interact. Suppose S and T are binary semaphores associated with resource ``s" and ``t" respectively
+    \begin{itemize}
+        \item Process A: Say P(S), P(T) // one process acquires s, followed by acquire t, V(T); V(S);
+        \item Process B: P(T), P(S) //acquire t first, then acquire s. V(S); V(T)
+        \item Process A wants process B's resource which can't be released because process B wants process A's resource (opposite order)
+        \begin{itemize}
+            \item Process A blocks on P(T), B blocks on P(S)
+            \item What's missing is an atomic operator that can handle more than one semaphore at a time
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Linux (and POSIX API) Semaphores
+\begin{itemize}
+    \item int semget(key\_t key, int nsems, int semflg)
+    \begin{itemize}
+        \item Key and flag has same meaning as in the other ``xxxget"s
+        \item Return value is the semid (or -1)
+        \item If semaphore doesn't exist, it will create one and return the new semid
+    \end{itemize}
+    \item int semop(int semid, struct sembuf *sops, size\_t nsops);
+    \begin{itemize}
+        \item struct sembuf \{\\unsigned short sem\_num; // semaphore number\\short sem\_op; // semaphore operation +1/-1\\short sem\_flg; // operation flags\\\}
+    \end{itemize}
+    \item semop gets an array of sembufs with nsops elements, each operating on its sem\_num, with a sem\_op of 1 (V) or -1 (P)
+    \item sem\_flg can have IPC\_NOWAIT, and/or IPC\_UNDO
+    \begin{itemize}
+        \item IPC\_UNDO: If a process dies holding the semaphore, then the lock will be undone (default is does not undo lock)
+    \end{itemize}
+\end{itemize}
+Example of ``P"
+\begin{itemize}
+    \item int s; int key = 1234;
+    \item s = semget(key, 1, 0666 | IPC\_CREAT);
+    \item P(int s) \{ \\struct semop op; \\op.sem\_num=0; //nth semaphore, semaphore number\\op.sem\_op=-1; // +/- 1 for semop\\op.sem\_flg=0;\\semop(s,\&op,1);\\\}
+    \item Demo: johnsem/marysem
+    \item semcntl to get rid of semaphore before running shmcntl to get rid of shared memory
+\end{itemize}
+Note
+\begin{itemize}
+    \item sem\_op: 1 means unlock, -1 means lock
+\end{itemize}
+Problem
+\begin{itemize}
+    \item If we run johnsem 3 times, it overwrites memory each time
+    \item Running marysem 3 times, only first time works
+    \item Sequencing problem rqeuiring alternation between John and Mary (Two semaphores needed):
+    \begin{itemize}
+        \item Initial setting: J=0; M=1;
+        \item John locks Mary (P(M)), John fills V(J)
+        \item P(J), Mary Adds, V(M)
+    \end{itemize}
+\end{itemize}
+
+\subsection{Signals}
+POSIX vs traditional UNIX/Linux systems API
+\begin{itemize}
+    \item POSIX extends (adds features) traditional APIs (classical API e.g. SYS V API)
+    \item POSIX support
+    \begin{itemize}
+        \item Linux didn't originally didn't support it. MacOS, Windows, and BSDs still don't
+    \end{itemize}
+\end{itemize}
+Signal Basics
+\begin{itemize}
+    \item Signals are a form of IPC, which delivers an asynchronous notification that an event has occured to a process
+    \item Signal can either be sent processs to process, or OS to process
+    \item The only content of a signal is an integer, the signal number
+    \item When a signal is received by a process, the default behavior is an abnormal termination
+    \begin{itemize}
+        \item Signal number is communicated to parent with wait syscall
+        \item Signals can be caught and sent to a handler instead
+    \end{itemize}
+\end{itemize}
+OS Signals
+\begin{itemize}
+    \item OS sends signals with established signal numbers
+\end{itemize}
+Signlas have three possible actions
+\begin{itemize}
+    \item Core (Terminate and dump core)
+    \item Term (Terminate)
+    \item Ign (Ignore)
+\end{itemize}
+SIGCHLD
+\begin{itemize}
+    \item Corresponds with action ignore (default SIG\_IGN)
+    \item Child stopped or terminated
+    \item Signal is delievered when a child dies
+\end{itemize}
+Shell
+\begin{itemize}
+    \item \% myprog abc
+    \item Normally does fork, exec, wait
+    \item Ampersand at end, means it doesn't wait
+\end{itemize}
+SIGUSR1 and SIGUSR2 are reserved signal numbers for process to process
+\begin{itemize}
+    \item ``kill" will never come from OS (must be SIGUSR1 or SIGUSR2)
+\end{itemize}
+Signal Table
+\begin{itemize}
+    \item Each process has a signal table in UBLOCK (besides fd table)
+\end{itemize}
+\textbf{FILL IN WHAT YOU MISSED (SIGNALS)}\\
+Signal Basics
+\begin{itemize}
+    \item Old version (classic) and new version (POSIX, standard signals)
+    \begin{itemize}
+        \item Almost everything in-common. Both worth knowing unlike other APIs
+    \end{itemize}
+\end{itemize}
+OS Signals
+\begin{itemize}
+    \item Send a signal number
+\end{itemize}
+Some other signals
+\begin{itemize}
+    \item SIGCHLD is a signal whose default is SIG\_IGN
+    \begin{itemize}
+        \item Signal is delivered when a child dies
+    \end{itemize}
+\end{itemize}
+The Signal Table
+\begin{itemize}
+    \item Each process has a signal table in its UBLOCK
+    \begin{itemize}
+        \item Indexed by signal number
+        \item Each entry is one of the following
+        \begin{itemize}
+            \item SIG\_IGN - Throw away the arriving signal
+            \item SIG\_DFL - Do whatever the default for the signal is
+            \item ADDRESS
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Classic API
+\begin{itemize}
+    \item Entire API has 1 syscall, ``signal"
+    \item sighandler\_t signal(int signum, sighandler\_t handler)
+    \begin{itemize}
+        \item handler is eiher the name of a function or SIG\_IGN or SIG\_DFL
+    \end{itemize}
+    \item If we specify a handler function for a specific signal number, the OS (when signal arrives)
+    \begin{itemize}
+        \item pushes the PC (for return point) and signal number on the stack
+        \item Resets the entry to SIG\_DFL
+        \item Sets the PC to the handler address
+        \item Simulates call to handler function with signal number as argument
+        \item Returning from handler pops the stack and reloads the PC, continuing execution as if it was never interrupted
+    \end{itemize}
+    \item Handler structure
+    \begin{itemize}
+        \item int handler(int signum) \{\\
+        signal(signu, SIG\_IGN); // avoid 2nd instance of signal\\
+        // the handler work\\
+        signal(signum handler); // rearm the signal \}
+    \end{itemize}
+    \item Standard handler fixes a bug in classic handler (signal(signum, SIG\_IGN) for ignoring signals while handling signal is not atomic
+    \begin{itemize}
+        \item Classic handler has a window of vulnerability, while in standard signal handler hold occured before handler was executed
+    \end{itemize}
+    \item OS reset the handler to SIG\_DFL to avoid recursion
+\end{itemize}
+Handler Strategy
+\begin{itemize}
+    \item Can fork to handle event
+    \item Setting a global variable
+    \item Handling error signals: (SIGVEC, SIGKILL, SIGINT, SIGFPE, etc.)
+    \begin{itemize}
+        \item Could do cleanup and exit
+        \item Could save some state for restart
+        \item Probably do NOT return to point of interruption
+        \item One option: return to point PRIOR TO conditions that prompted error (e.g. division by 0) and alter behavior accordingly
+        \begin{itemize}
+            \item Kind of like ``time travel" back in time
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Time Travel
+\begin{itemize}
+    \item Recall in 255, each function pushes a stack frame with local variables
+    \item If we want to go back, move stack pointer (longjmp)
+\end{itemize}
+Longjmp
+\begin{itemize}
+    \item Feature of C, NOT of signals (completely independent)
+    \item int setjmp(jmp\_buf env);
+    \begin{itemize}
+        \item Saves the registers in a global variable buffer ``env"
+        \item Return for setjmp can happen two ways
+        \begin{itemize}
+            \item From original execution (where it will return 0)
+            \item From the ``time jump"
+        \end{itemize}
+        \item void longjmp(jmp\_buf env, int val);
+    \end{itemize}
+\end{itemize}
+kill -l prints out signal number\vspace{0.15in}\\
+End of Classic API
+\begin{itemize}
+    \item Kill and alarm are the same for both APIs (external to signal API)
+\end{itemize}
+Standard Signals (POSIX)
+\begin{itemize}
+    \item In classic signals on structure for controlling signal delivery is the Signal Table in process UBLOCK
+    \item SIG\_IGN causes arriving signal to be discarded
+    \item To accomodate SI\_IGN throwing out arriving signal, an additional structure is added to UBLOCK (signal mask)
+\end{itemize}
+The Signal Mask
+\begin{itemize}
+    \item Signal Mask is a bitmap with one bit for each signal number
+    \item A `1' in the mask means block the signal corresponding to the position
+    \item To manipulate signal mask, there is a sigset\_t data structure (representas a bitmap of signals)
+    \begin{itemize}
+        \item int sigemptyset(sigset\_t *set) // all 0
+        \item int sigfillset(sigset\_t *set) // all 1
+        \item int sigaddset(sigset\_t *set, int signum)
+        \item int sigdelset
+        \item sigismember
+        \item Note: these are utility functions, not syscalls
+    \end{itemize}
+\end{itemize}
+Posix System Calls
+\begin{itemize}
+    \item int sigprocmask(int how, const sigset\_t *set, sigset\_t *oldset)
+    \begin{itemize}
+        \item Manipulates signal mask using the ``set" according to ``how"
+        \begin{itemize}
+            \item how: SIG\_BLOCK, SIG\_UNBLOCK, SIG\_SETMASK
+        \end{itemize}
+        \item ``oldset" returns the previous value of the signal mask
+    \end{itemize}
+    \item int sigaction(int signum, const struct sigaction *act, *oldact)
+    \begin{itemize}
+        \item Replaces the classic ``signal" system call (signal but on steroids)
+        \item Has two more entries in sigaction: sa\_mask and sa\_flags
+        \item When handler is invoked, sa\_mask + signum are added to signal mask (for blocking?)
+    \end{itemize}
+    \item on return from handler, previous signal mask restored
+\end{itemize}
+In POSIX, setjmp and longjmp are modified to include Signal Mask
+\begin{itemize}
+    \item sigsetjmp
+    \item siglongjmp
+\end{itemize}
+Jumping
+\begin{itemize}
+    \item setjmp, longjmp interface has been modified to allow a 
+    choice of how the Signal Mask should be handled on a Jump.
+    \item sigsetjmp
+    \item siglongjmp
+\end{itemize}
+One potential bug (with classical longjmp and classical signal syscall, as found in oldsignals.c, signals.c contains the POSIX siglongjmp)
+\begin{itemize}
+    \item Only first longjmp works because it doesn't reset signal mask from blocking
+\end{itemize}
+Lab 3
+\begin{itemize}
+    \item manage +
+    \item compute 100 +
+    \item report
+    \item compute 10000+
+    \item report
+    \item report -k (give final report, but also terminate computes and manage)
+    \item Now onto each component
+    \item Manage
+    \begin{itemize}
+        \item Create and maintain IPC elements, shared memory segment, messae Q, semaphore
+        \item Keep track of active compute processes  
+        \item Remember, locking semaphores is a syscall (require context switch) which would lead to two context switches to just check a bit. Therefore, semaphores are NOT a good solution to protecting the bitmap. Alternative: single process manages resources for all processes (manage process will have a message queue), when a process has found a perfect number, it will send a message to the manage process. Manage will also be responsible for keeping array in sorted order (DESIGN PATTERN, having a manager)
+        \begin{itemize}
+            \item One other issue, this single manager process successfully manages the number array, but we can have race conditions with overwriting with process rows as well. Let manage deal with this as well
+        \end{itemize}
+        \item report with -k will not only issue report but send a signal to manage to shut everything down
+        \item Should have a structure for shared memory segment in defs.h (want to put a version of that in each program)
+        \item For max points, store 1 bit per bit (i.e. 32 bits in int), for 90 pts max do 1 byte each
+    \end{itemize}
+\end{itemize}

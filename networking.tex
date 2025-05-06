@@ -1,0 +1,173 @@
+Basics
+\begin{itemize}
+    \item Simpliest configuration: Local Area Network (LAN)
+    \item Each computer connects to network cable with NIC (network interface card)
+    \item Each NIC has a MAC (media access control) address
+    \item Computers communicate with data packets sent to MAC addresses
+\end{itemize}
+Ethernet
+\begin{itemize}
+    \item Developed by Xerox, DEC (Digital Equipment Corporation), and Intel in 1974. The protocol itself is basically unchanged (with some exceptions)
+    \item An ethernet packet is structured as:
+    \begin{itemize}
+        \item preamble: 8 bytes. Sanity check that this is an ethernet packet
+        \item Destination address: 6 bytes. Destination MAC address
+        \item Source address: 6 bytes: source MAC address
+        \item Type field
+        \item User data: limited to 1500 bytes, where 12 bytes are reserved for destination + source address
+        \item FCS (frame check sequence): 4 bytes. Checks errors?
+    \end{itemize}
+    \item Each ethernet NIC has a unique 6 byte MAC address
+    \begin{itemize}
+        \item Allows $2^48 = 281$ trillion different addresses
+    \end{itemize}
+    \item Over the years, the media and NICs have improved and speed has increased to commonly 1 GB/sec. Data centers typically have 10 GB version, and in specialized environments there are versions with speeds of 100s of GB
+\end{itemize}
+Internet Protocol
+\begin{itemize}
+    \item MAC addresses are random numbers and keeping track of them would be hard on a big LAN, and impossible for interconnected LANs with different administration
+    \begin{itemize}
+        \item To solve this, an additional IP address was defined. It is a 32-bit address divided into (NET, HOST) i.e. network number, host number. The division can be divided in various ways (248-8 Class A, 16-16 Class B, or 8-24 Class C)
+        \begin{itemize}
+            \item Emory as a class B (16-bit network number, 16-bit host numbers). Limited to 64000 ($2^16$) hosts/IP addresses (i.e. we can have 64,000 computers). Same number for number of networks. Our NET is 70.140 (each decimal number is between 0 and 255, meaning 8-bits)
+        \end{itemize}
+        \item On a LAN, a machine can determine the MAC address of another machine on the LAN, by BROADCASTING an ARP packet with a ``who is" request. Broadcasts don't get off the LAN
+        \begin{itemize}
+            \item A machine can determine MAC address of another machine by BROADCAST request (called an ARP packet, which contains a machine name) which is sent to all machines on the LAN
+            \item ARP stands for Address Resolution Packets
+            \item The identified computer sends back its MAC address
+            \item This only works on same LAN with same network came
+            \item This version of IP is called IPv4 with $2^{32} \sim 4\times 10^9$ addresses
+            \item Newer version IPv6 has 128 bit addresses: $2^{128} \sim 3\times 10^{38}$ (approximately number of atoms in solar system)
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+More IP
+\begin{itemize}
+    \item Broadcast, ARP restricted to LAN
+    \item Consider two  LANS connected by a router
+    \item The router is a HOST on each LAN
+    \item When a HOST on LAN 1 wants to send to LAN 2, it sends to the router
+    \begin{itemize}
+        \item The router then ARPs on LAN2, then sends the packet to the right machine in LAN2
+    \end{itemize}
+    \item To talk to machines on other LANs, must send packet to router, which sends it to the machine on the other LAN
+    \item The HOSTS on LAN1 all have the same NET number and the ones on LAN2 all have a different NET number. The router has both NET numbers  because it has two NICs
+    \item Each LAN is connected to an edge router. The routers exchange routing info on NET number destinations via routing protocols
+    \item The HOSTS on the ethernet LANs use ethernet packets that encapsulate the IP packet
+\end{itemize}
+Transmission Control Protocol
+\begin{itemize}
+    \item IP gets packets from one HOST to another, but we are interested in IPC, getting data from one process to another
+    \item TCP establishes a virtual port number, that a process can bind to. This allows (NET1, HOST1, PORT1) to send to (NET2, HOST2, PORT2). The first two are from IP, the third from TCP
+    \item There is more to TCP than just the port numbers. TO be an effective IPC mechanism, it must have the same reliability as a pipe on the local machine
+    \item There is a networking course that gets into the details, including the other fields in the IP and TCP packets and protocols, but basically the TCP protocol:
+    \begin{itemize}
+        \item Ensures data received is correct (checksum)
+        \item Ensures no data is lost in transit
+        \item Ensures the data arrives in the other sent
+        \item Provides Flow Control to optimize throughput (what if we are sending from a fast machine to a slow machine? If we send packets too quickly, the receiver will drop some packets, same with opposite case - the `saturation' of routers in-between)
+    \end{itemize}
+\end{itemize}
+Socket API - writing programs that take advantage of networking (IPC)\vspace{0.15in}\\
+\begin{itemize}
+    \item Developed at Berkeley (transition from AT\&T (Bell Labs) Unix SYSV to Berkeley Unix BSD, the emphasis went from telephones/modems to computer networks)
+    \begin{itemize}
+        \item Bell Labs was more focused on communicating with telephones/modems as a telecommunications company. Berkeley wanted a more generalizable version
+        \item General protocol and infrastructure to accommodate communication across all forms of media
+        \item API treats socket as endpoint of a communication
+        \item Read and write date from/to one socket to another
+        \item Sockets have fds
+    \end{itemize}
+\end{itemize}
+Socket Paradigm
+\begin{itemize}
+    \item Breaks up into client and server (two processes)
+    \item CLIENT syscalls
+    \begin{itemize}
+        \item socket (obtain socket fd)
+        \item connect (connects to remote socket)
+        \item read/write on fd
+    \end{itemize}
+    \item SERVER syscalls
+    \begin{itemize}
+        \item Socket (obtain a socket afd, file descriptor for accepting, for accepting clients)
+        \item Bind (to a port: interested in connections to this port)
+        \item listen (sizes the waiting room. The waiting room: when you connect to a server, there may be many clients connecting to the server, and the server can only accept one at a time. Can accept as many as you want to accept, but there is period between when client requests connection and server accepts connection, so period of time when connection requests are pending. Returns number of pending connection requests)
+        \item Accept on afd yielding a read/write fd (blocks until a client connect)
+        \begin{itemize}
+            \item read/write on fd processing the client, perhaps after a fork
+        \end{itemize}
+        \item The last two (loop over accept) in a loop
+    \end{itemize}
+\end{itemize}
+Socket syscall
+\begin{itemize}
+    \item int socket(int domain, int type, int protocol); int socket(int domain, int type, int protocol);
+    \begin{itemize}
+        \item domain is an address family the most popular (3 important domains) are AF\_INET, AF\_INET6, and AF\_UNIX. There are others (man page)
+        \item Type is SOCK\_STREAM (set of data, no boundaries, like a pipe) or SOCK\_DGRAM (Each item transaction of fixed description, like message queues)(there are others)
+        \begin{itemize}
+            \item SOCK\_STREAM is continuous data like in a pipe
+            \item SOCK\_DGRAM are discrete pieces of data more like in a message Q
+        \end{itemize}
+        \item A 0 for protocol will match he default for domain/tpe or a specific protocol number can be specified. SOCK\_STREAM will get TCP, SOCK\_DGRAM will get UDP
+        \begin{itemize}
+            \item UDP is User Datagram Protocol, a low-latency loss-tolerant protocol
+        \end{itemize}
+        \item The return value is a fd or -1 (errno set)
+    \end{itemize}
+\end{itemize}
+Connect, Bind, listen
+\begin{itemize}
+    \item int connect(int sockfd, const struct sockaddr *addr, socklen\_t addrlen);
+    \item int bind(int sockfd, const struct sockaddr *addr, socklen\_t addrlen);
+    \begin{itemize}
+        \item Note address lengths are a parameter because of how general API is (doesn't even know size of address)
+        \item Same signature, connect is client, bind is server
+        \item Returns 0 on success, -1 on error (sets errno)
+        \item There is a different sockaddr struct for each address family
+        \begin{itemize}
+            \item sockaddr\_in, sockaddr\_in6, sockaddr\_un. These get cas to sockadd
+        \end{itemize}
+    \end{itemize}
+    \item int listen(int sockfd, int backlog)
+    \begin{itemize}
+        \item Sizes how many clients the OS must buffer until an accept
+    \end{itemize}
+\end{itemize}
+struct sockaddr\_in
+\begin{itemize}
+    \item IN\_ADDR takes any address. Normally addresses can be different for external and internal as well?
+\end{itemize}
+DNS
+\begin{itemize}
+    \item IP addresses give enough information for routing, but have limitations
+    \begin{itemize}
+        \item NOT logical addresses. Organizations can have hosts on many networks. The address space is flat with no hierarchy
+        \item They are not human friendly, particularly IPv6 (128 bits). We need a more friendly way of specifying IP address
+        \item No one source can manage all IP addresses and updates
+    \end{itemize}
+    \item DNS the Domain Name System addresses these issues
+    \begin{itemize}
+        \item Eg: cs.emory.edu
+        \begin{itemize}
+            \item The root DNS servers have the address of the top level domain (edu, com..)
+            \item Edu has the address of its subdomains (emory, gatech ..)
+            \item emory has the address of its subdomains (cs, math, ..)
+            \item cs has the address of all its hosts (lab0z, lab1a, ..)
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Address API
+\begin{itemize}
+    \item Sockets need an address, so the hostent (struct) is used for translations between host names and addresses
+    \begin{itemize}
+        \item hostend hostend has h\_name (official name of host), h\_aliases (alias list), h\_addrtype (host address tpe), h\_length (lengh of address), h\_addr\_list (list of addresses)
+    \end{itemize}
+    \item struct hostent *gethostbyname(const char *name);
+    \begin{itemize}
+        \item Returns hostent that has all the data abt the host
+    \end{itemize}
+    \item struct hostent *gethostbyaddr(const void *addr, socklen\_t len, int type); 
+\end{itemize}

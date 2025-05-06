@@ -1,0 +1,209 @@
+Processes vs Threads
+\begin{itemize}
+    \item Linux/Unix typically divides work between processes
+    \begin{itemize}
+        \item fork/exec
+        \item pipes (prog1 $|$ prog2)
+        \item Nice property: one process cannnot corrupt the address space of another process (processes fail in isolation)
+        \item On a multiprocessor system allows simul exec. of multiple processes for parallelism
+        \item Blocking IPC automatically supports producer/consumer model (bc of blocking capabilities)
+    \end{itemize}
+\end{itemize}
+Disadvantages of multi-processes
+\begin{itemize}
+    \item If there is a lot of data sharing, it can be dominated by IPC and context-switching overhead
+    \begin{itemize}
+        \item IPC inherently inolves read/write syscalls, which means context-switch overhead
+        \item The only exeption to read/write + context switch overhead: shared memory. But, shared memory is precious and finite. It can arguably be better to share the data in the same address space (which threads allow)
+    \end{itemize}
+\end{itemize}
+Threads
+\begin{itemize}
+    \item Each thread gets its own private STATE kept within the single address space
+    \begin{itemize}
+        \item PC, SP, STACK, other registers: each has private local variables
+        \item All threads share the process TEXT, DATA/BSS/HEAP - so share global variables
+        \item A thread that blocks on a syscall does not block the other threads (a POSIX requirement)
+        \begin{itemize}
+            \item Ex: works well with GUI. GUI threads do not block, while work threads block during I/O
+            \item webserver can service many requests at once without blocking
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Threaded Processes Address Space
+\begin{itemize}
+    \item UBLOCK
+    \item STACK (Main Thread)
+    \item THREAD STACKS
+    \item Heap
+    \item BSS
+    \item DATA
+    \item TEXT (contains text segment of each thread)
+\end{itemize}
+
+\subsection{Pthreads}
+Pthreads is POSIX API to using threads (MacOS, Android)
+\begin{itemize}
+    \item int pthread\_create(pthread\_t *thread, const pthread\_attr\_t *attr, void *(*start\_routine)(void *), void *arg);
+    \begin{itemize}
+        \item thread is a thread ID (like a pid)
+        \item start\_routine is a function for the thread to execute
+        \item arg is a single argument for the start\_routine. It can point to anything, including a structure with several fields
+        \item Attr points to a pthread\_attr\_t structure which has several attributes for the thread, including size of stack and scheduling parameters
+    \end{itemize}
+    \item void pthread\_exit(void *retval) // forcefully terminates thread
+    \item int pthread\_join(pthread\_t thread, void **retval); // equivalent to wait
+    \begin{itemize}
+        \item Blocks until target thread exits
+    \end{itemize}
+\end{itemize}
+Attributes
+\begin{itemize}
+    \item To override the default attributes of a new thread, the attr structure must be initialized
+    \item Parameters into pthread\_create should always be pointers
+    \item To override the default attributes of a new thread, attr struct must be initialized
+    \begin{itemize}
+        \item pthread\_attr\_t attr;
+        \item int pthread\_attr\_init( *attr)
+    \end{itemize}
+    \item Once initialized there are series of functions for setting specific attributes
+    \begin{itemize}
+        \item int pthread\_attr\_setscope (pthread\_attr\_t *attr, int scope);
+        \item PTHREAD\_SCOPE\_SYSTEM, PTHREAD\_SCOPE\_PROCESS
+        \item int pthread\_attr\_setstacksize(pthread\_attr\_t *attr, size\_t stacksize);
+        \begin{itemize}
+            \item Has to be done as part of creating the thread, can't be done after thread is created
+        \end{itemize}
+    \end{itemize}
+\end{itemize}
+Note: -l links in library. So, -lpthread includes pthread library (dll?)\vspace{0.15in}\\
+\subsubsection{Synchronization of Threads}
+Since threads share global variables (DATA, BSS, HEAP) extreme care is required to synchronize access
+\begin{itemize}
+    \item A critical section is a section of code in which we must ensure that execution can be done only one thread at a time
+    \begin{itemize}
+        \item Doing updates to shared data in a critical section ensures that the update is atomic
+    \end{itemize}
+    \item The primitive for protecting a critical section is a ``mutex"
+    \begin{itemize}
+        \item Behaves like binary semaphore. HOWEVER, semaphores are system calls (context switches) and mutexes are not. Mutex is implemented with much lighter weight (may start as a spin-lock (keep checking lock over and over again), which eventually triggers a context switch)
+        \begin{itemize}
+            \item If it spins too many times, it will issue a syscall to lock/block, which triggers context switch (normally not bad)
+        \end{itemize}
+        \item This matters a lot especially when exclusion is gained in very small intervals of time
+    \end{itemize}
+    \item \textbf{Recommended to initialize a global mutex variable}
+    \begin{itemize}
+        \item pthread\_mutex\_t mutex = PTHREAD\_MUTEX\_INITIALIZER
+        \item If it's a local mutex (dynamic mutexes), it cannot be initialized by compiler (must be initialized by a slightly complicated function call: pthread\_mutex\_init)
+        \item Lock mutex and unlock mutex before and after critical section
+    \end{itemize}
+\end{itemize}
+More on Mutex
+\begin{itemize}
+    \item int pthread\_mutex\_lock(pthread\_mutex\_t *mutex);
+    \begin{itemize}
+        \item Blocks until resource is unlocked i.e. we can lock the mutex
+    \end{itemize}
+    \item int pthread\_mutex\_trylock(pthread\_mutex\_t *mutex)
+    \begin{itemize}
+        \item Fail if can't lock (non-blocking)
+    \end{itemize}
+    \item int pthread\_mutex\_unlock(pthread\_mutex\_t *mutex);
+\end{itemize}
+Thoughts on 350 Quiz
+\begin{itemize}
+    \item Question 8: Exec takes text, data, BSS of new process (wipes old), wipes heap to be empty. What goes into signal table is address of handlers, which is NOT preserved after exec (but is it preserved after fork). SIG\_INT and SIG\_DFL are preserved, but handlers themselves are not preserved. From my intuition is this because text segment is wiped (function code for handlers gone)
+    \item Exam does not cover Threads
+\end{itemize}
+Each thread gets its local variables
+\begin{itemize}
+    \item However, they all share the process data, bss, heap
+    \item Thread code is stored in the text segment
+    \item Note: for retval in pthread\_exit and pthread\_join do NOT return a pointer to local (stack) variable for scope reasons
+\end{itemize}
+Condition Variables
+\begin{itemize}
+    \item Works especially well in producer-consumer paradigms
+    \item While mutexes provide exclusion it encourages busy/wait loops that burn cpu
+    \begin{itemize}
+        \item In our demo Mary uses a critical section that checks while next 1000 numbers are ready. This works, but repeatedly checking sucks
+    \end{itemize}
+    \item Need a mechanism to be able to block until an event occurs rather than keep checking
+    \item Condition Variable Paradigm
+    \begin{itemize}
+        \item CONSUMER
+        \begin{itemize}
+            \item pthread\_mutex\_lock\\While (TEST-CONDITION == FALSE) pthread\_cond\_wait; // blocks for sig\\// use resource\\pthread\_mutex\_unlock;
+        \end{itemize}
+        \item PRODUCER
+        \begin{itemize}
+            \item pthread\_mutex\_lock; // Produce Resource\\
+            pthread\_cond\_signal;\\
+            pthread\_mutex\_unlock;
+        \end{itemize}
+    \end{itemize}
+    \item pthread\_cond\_t cond = PTHREAD\_COND\_INITIALIZER;
+    \item int pthread\_cond\_wait(pthread\_cond\_t *restrict cond, pthread\_mutex\_t *restrict mutex);
+    \begin{itemize}
+        \item The wait is the consumer
+    \end{itemize}
+    \item int pthread\_cond\_signal(pthread\_cond\_t *cond);
+    \item int pthread\_cond\_broadcast(pthread\_cond\_t *cond)
+    \item Notes:
+    \begin{itemize}
+        \item cond\_wait blocks until signaled and relocks mutex atomically
+        \item cond\_signal might wake more than one, cond\_broadcast wakes all (notify all)
+        \item cond\_wait should always retest the predicate (other threads may have already acquired based on the condition, making it no longer true)
+    \end{itemize}
+\end{itemize}
+Other pthread functions
+\begin{itemize}
+    \item int pthread\_cancelt(pthread\_t thread)
+    \begin{itemize}
+        \item One way for one thread to terminate another thread
+        \item Doesn't work unless the other thread is at a cancellation point (manly system calls)
+        \item If a thread is hung up on a read system call, you can cancel out. Otherwise, thread will keep running until it hits a cancellation point, where it will die
+        \item Can also call pthread\_testcancel(void); to create a cancellation point
+        \item pthread\_t pthread\_self(void)
+        \begin{itemize}
+            \item Returns thread id of current thread
+        \end{itemize}
+        \item int pthread\_detach(pthread\_t thread)
+        \begin{itemize}
+            \item Normally, we join threads. But, we can detach threads i.e. will not be joined at termination
+            \item pthread exit will just exit without creating thread blocking, resources auto released
+            \item Can also use an attribute at pthread\_create for this (pthread\_attr\_setdetachstate)
+        \end{itemize}
+        \item All standardd POSIX routines are thread safe except for a list of exceptions. See ``man 7 pthreads"
+    \end{itemize}
+\end{itemize}
+Signals with pthreads
+\begin{itemize}
+    \item A threaded process still has only one signal table
+    \item Every thread has its own signal mask
+    \begin{itemize}
+        \item Initially a copy of the mask from the thread creating it
+        \item It can be altered with pthread\_sigmask, which has the same arguments as ``sigprocmask" in the not-threaded case
+    \end{itemize}
+    \item synchronous signals are ones associated with a specific thread
+    \begin{itemize}
+        \item Eg: A SIGSEGV, SIGFPE, SIGKILL, etc.
+        \item Also: int pthread\_kill(pthread\_t thread, int sig)
+        \item Synchronous signals are delivered to the specific thread that caused the synchronous signal
+        \begin{itemize}
+            \item Ex: divide by 0, execute handler for SIGFPE
+        \end{itemize}
+        \item Asynchronous signals are ones that are not associated to a specific thread (SIGHUP, SIGINT, kill(), ...)
+        \begin{itemize}
+            \item It is delivered to a random thread whose signal mask permits the signal (not blocked)
+        \end{itemize}
+        \item If the signal table has the signal set to SIG\_DFL the whole process dies if that signal is delivered even if it is a synchronous signal only involving one thread
+        \item Alternative signal approach
+        \begin{itemize}
+            \item int sigwait(const sigset\_t *set, int *sig)
+            \item Blocks calling thread until one of the signals in the set is delivered and sig tells which one
+            \item Combine this with using the pthread\_sigmask to block it in other threads, turns this thread into an internal handler for the set
+        \end{itemize}
+    \end{itemize}
+\end{itemize}

@@ -1,0 +1,495 @@
+\subsection{A brief overview of Operating Systems}
+
+What is an Operating System?
+\begin{itemize}
+    \item A computer program that controls the \textbf{resources} of a computing system in an \textbf{efficient} and \textbf{convenient} manner
+    \item Resources (managing hardware)
+    \begin{itemize}
+        \item CPUs
+        \item Memory
+        \item I/O Devices (Disks, Printers, Network Devices, etc.)
+    \end{itemize}
+    \item Efficient
+    \begin{itemize}
+        \item Must manage competing requests to optimize performance
+        \item Example: Disk requests at distant areas of the disk
+    \end{itemize}
+    \item Convenient
+    \begin{itemize}
+        \item Presents a System API that hides lowest level details
+    \end{itemize}
+    \item The OS program is referred to as the `kernel'
+\end{itemize}
+Operating Systems Examples
+\begin{itemize}
+    \item Linux, BSD (Berkeley Software Distribution), MacOS, Mach (CMU Operating System, which can run multiple operating systems), Android (Linux-based, but an Android API layer on top), Windows
+    \item Some history
+    \begin{itemize}
+        \item BSD added networking (sockets) to Unix (revolutionary)
+        \item Sun Microsystems developed SunOS
+        \item Microsoft developed Xenix from Unix
+        \item NextStep introduced a version of Berkeley Unix where after NeXT was acquired, macOS was built from NextStep (originally, Apple's operating system was written in assembly and could only run on a Motorola CPU and couldn't run two things at the same time on Apple II computer)
+        \item Apple's next OS combined Mach and BSD, but doesn't have any Apple GUI itself. MacOS runs Darwin
+        \item UNIX went to GNU, which went into Linux
+    \end{itemize}
+\end{itemize}
+Open Source
+\begin{itemize}
+    \item Linux and the BSD's are Open Source
+    \begin{itemize}
+        \item Can download the source and modify it as you wish
+        \item No license is required to port it and run it on any hardware you like
+    \end{itemize}
+    \item Linux runs on very wide variety of systems
+    \begin{itemize}
+        \item Includes Supercomputers, GPU servers, household appliances, network equipment (routers, switches)
+    \end{itemize}
+    \item Proprietary Operating Systems (Windows, MacOS) can only run on hardware provided by vendor (Apple) or licensed for a fee (Microsoft)
+\end{itemize}
+
+\subsubsection{POSIX}
+POSIX: Portable Operating Systems Interface
+\begin{itemize}
+    \item IEEE open standard which formalizes the operating systems API originating in UNIX
+    \item POSIX is the main systems interface to the open systems operating systems (including Linux)
+\end{itemize}
+Proprietary operating systems also support POSIX to an extent, but it is NOT the main interface (and may not be fully implemented)
+\begin{itemize}
+    \item In other words, although MacOS and Windows support POSIX, they are not fully compatible
+\end{itemize}
+\subsection{Two types of programs: System Programs vs Application Programs}
+\subsubsection{Application Programs}
+Application Programs are programs that are predominately ``business logic"
+\begin{itemize}
+    \item Concentrate on DSA and presentation
+    \item The OS is used in a generic way...
+\end{itemize}
+
+\subsubsection{Systems Programs}
+Systems Programs are programs that make sophisticated use of OS services to gain performance or interact directly with systems hardware and software resources
+\vspace{0.15in}\\
+Examples
+\begin{itemize}
+    \item Performance: Use multiple CPUs
+    \item Hardware and Software: A backup program
+    \item Software: Have multiple programs interact with each other
+\end{itemize}
+The OS runs System Processes/Program. Some examples: 
+\begin{itemize}
+    \item Firefox (talks to a webserver to get the information that is displayed, interacting with operating system on networking over the web)
+    \item ls (interacts directly with operating system)
+    \item bash (interacts directly with OS as well)
+\end{itemize}
+Example of something not being a systems program
+\begin{itemize}
+    \item A sort function
+\end{itemize}
+We are working with System Processes (i.e. programs that `talk' to the OS)
+
+\subsection{C Programming}
+Motivating C: Why C in Systems
+\begin{itemize}
+    \item \textbf{Java is an interpreted language} and not efficient
+    \item \textbf{Java has no direct access to the OS}. OS supported by native code written in C
+\end{itemize}
+C Programming Structure
+\begin{itemize}
+    \item C has no classes
+    \item All code is organized into functions
+    \begin{itemize}
+        \item Main is the first function called when OS invokes the program
+        \item Return from main terminates and returns to OS
+        \item OS passes the command line that invoked the program as arguments to the function main
+    \end{itemize}
+\end{itemize}
+\subsubsection{More on Main}
+Signature of main: int main(int argc, char * argv[])
+\begin{itemize} 
+    \item argc: number of arguments
+    \item argv[0]: name of the program
+    \item argv[i] is the ith word on the command line
+    \item Ex: \% myprog alpha beta (\% sign indicates prompt)
+    \item return integer form main goes back to the OS which supplies it to the invoking program, which uses that value to decide on success of terminating program
+\end{itemize}
+\subsubsection{C Storage}
+C has no classes. Storage is assigned with reference to address space model. Storage components listed in general order of high addresses to low addresses
+\begin{itemize}
+    \item Stack (Local variables, functions)
+    \item Heap (Malloc)
+    \item BSS (block started by symbol): uninitialized global variables
+    \item Data: Initialized global variables
+    \item Text: Object Code
+\end{itemize}
+\subsubsection{Local Variables}
+\begin{itemize}
+    \item Declared within a function
+    \item Lexical scope in the function (can only be referenced by name inside function)
+    \item Persistent for the life for the function
+    \item Stored on the stack
+    \item When a function is invoked, it gets a `stack frame' pushed onto stack which has storage for the local variables and arguments to the function. References are via the stack pointer
+    \item Saved in call-clobbered registers (caller-saved registers, can think of `clobbered' as being deleted upon destruction of stack frame)
+    \item \textbf{REMEMBER:} Stack frames are expensive, if you are focusing on maximizing efficiency, minimize unnecessary function calls and recursion. If you can implement an algorithm iteratively, it will be more performant than recursion
+\end{itemize}
+\subsubsection{Global Variables}
+\begin{itemize}
+    \item A variable ``definition" establishes its type\textbf{ and allocates storage}
+    \begin{itemize}
+        \item Eg. int x; (goes to BSS)
+    \end{itemize}
+    \item A variable ``declaration" just establishes its type
+    \begin{itemize}
+        \item Eg. extern int x
+    \end{itemize}
+    \item Lexical scope is all functions in the file its declared or defined in
+    \item Global variables are stored in the Data (initialized) or BSS (uninitialized)
+    \item Local variables override Global variables
+    \item Persistent for the life of the program
+    \item Defined global variables can be hidden with the ``static" keyword
+    \begin{itemize}
+        \item Eg. static int x
+    \end{itemize}
+\end{itemize}
+Misc Storage
+\begin{itemize}
+    \item Register variables give a \textbf{hint} (DOES NOT HAVE TO BE FOLLOWED BY COMPILER) to the C compiler that a variable is going to be used frequently, and storing it in a CPU register would avoid fetching it back and forth from memory
+    \begin{itemize}
+        \item Compiler may or may not take the suggestion
+        \item Optimizing compilers may know better than you best use of registers
+        \item Eg. register int x
+    \end{itemize}
+    \item The static keyword also has a use for local variables (`I want this local variable to be persistent')
+    \begin{itemize}
+        \item A static local variable is stored in the Data or BSS not the stack, and is persistent. Be careful with recursion!
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Structs}
+In Java Classes organize related data into fields
+\begin{itemize}
+    \item In C, related data is organized into structs
+    \item Struct assignment, sticks contents of rhs and copy it into the lhs struct
+    \item Storage could be local or global depending on where defined
+\end{itemize}
+
+\subsubsection{Typedef}
+\begin{itemize}
+    \item Remember: can typedef structs
+    \item Ex: typedef struct employee { ... } empl;
+    \item We don't need `employee' in the struct typedef: it is a ``structure tag"/``struct label" and is fully optional
+\end{itemize}
+Pointers
+\begin{itemize}
+    \item Java has ``reference variable". The Java model is that you create a reference variable and the storage it refers to at the same time.
+    \item In C a pointer variable is a variable that can contain the address of storage, but it may not. Separate code manipulates the address in it;
+    \item Ex: int x,y, *pt; (x, y are integers, pt is pointer to integer)
+    \begin{itemize}
+        \item x = 5; pt = \&x (pt stores address of x), y = *pt (y stores dereferenced value i.e. x)
+        \item *pt2 = *pt1 (copies dereferenced pt1 value into value of pt2). pt2 now points to copy of values from pt1
+    \end{itemize}
+\end{itemize}
+\subsubsection{Dynamic Allocation}
+\begin{itemize}
+    \item Java has a ``new" operator (built into Java Virtual Machine, which is a program itself that has an pre-allocated, NOT DYNAMIC, amount of storage. This makes it bulky memory-wise) built into the language for dynamic allocation
+    \item C has NOTHING built into the language for dynamic allocation. The compiler allocates all the global storage at compile time and sizes the DATA and BSS segments accordingly
+    \item There's no universal way to allocate storage (it is dependent on operating system and different classes of storage). C has to use assembly language for the specific computer to get more storage (not portable)
+    \begin{itemize}
+        \item In other words, this lack of a feature is on purpose
+        \item To dynamically allocate memory, C has to call OS library routines that are NOT written in C. They are written in assembler and invoke the OS to allocate the memory
+        \item void *malloc(size\_t size); (written in asm)
+        \item void free(void *ptr)
+        \item Malloc is unaware of what the purpose of the allocation is. Its just going to ask the OS for ``size" bytes, and return a pointer to the first of those bytes. Free returns the bytes if they are no longer needed
+    \end{itemize}
+    \item sizeof IS NOT A FUNCTION. It is a compiler keyword/compiler directive. In other words, IT DOES NOT RUN DURING THE PROGRAM, IT IS COMPUTED DURING COMPILATION
+    \item A cast tells the compiler to think of a pointer as a other kind of pointer
+\end{itemize}
+\subsubsection{Arrays}
+Arrays as opposed to structs organize data into an indexed (contiguous structure)
+\begin{itemize}
+    \item Creating an array does two things: allocate an array and allocate storage
+    \item Recall: pointer arithmetic with indexing
+    \item Dynamic allocation: malloc
+    \begin{itemize}
+        \item emprec *staff; staff = (emprec *) malloc (1100 * sizeof(emprec));\\staff[5].hours = 40; OR (staff + 5) $\rightarrow$ hours = 40;
+    \end{itemize}
+    \item Dynamically sized arrays are not standard. Use malloc
+\end{itemize}
+\subsubsection{Input/Output}
+\begin{itemize}
+    \item The C language has NO input or output defined within the language. THIS IS ON PURPOSE. A smartwatch, a laptop, a guidance system, and a smart speaker do very different types of input and output
+    \item Like memory allocation, the language needs to call library routines not written in C that invoke OS services for the particular platform
+    \item There is a standard C library called libc (or glibc) that has the standard I/O routines printf and scanf. These are formatted I/O routines. Consult the man page
+\end{itemize}
+
+\subsubsection{Strings}
+\begin{itemize}
+    \item C has no strings. This is on purpose, a string could involve fonts metrics, descenders, bitmaps, etc. This is too platform specific for the C language. Platform or Application libraries could allow for this, but its not part of the language
+    \item C does have a convention: null-terminated char array
+    \item Null: `$\backslash$000'
+    \item Libc does have a set of function to manipulate null-terminated character arrays (C itself DOESN'T). Check out ``man 3 string". For example strcmp, strcat, ctrcpy, index, etc.
+\end{itemize}
+
+\subsubsection{Misc}
+\begin{itemize}
+    \item Bit manipulation
+    \item C has a pre-processor called cpp which does substitutions into your source code before its compiled. A ``\#" at the beginning of a line indicates a pre-processor command (define macros)
+    \item \#include $<$stdio.h$>$ inserts definitions into your code
+\end{itemize}
+
+\subsubsection{GDB Debugger}
+\begin{itemize}
+    \item GDB the Gnu Debugger is an important Systems tool that is essential for systems work
+\end{itemize}
+\subsubsection{Getopt and Make}
+\begin{itemize}
+    \item While Getopt and Makefiles are not part of C language, they contribute to readable and maintainable C software
+    \item Getopt is a routine that parses argv for options that are specified with a ``-" on the command line. For example:\\myprog -n -f abc
+    \item Getopt man page: https://www.man7.org/linux/man-pages/man3/getopt.3.html
+    \item getopt.h, optarg is declared in the header
+    \item remember, valgrind for memory leaks
+\end{itemize}
+
+\textbf{Questions}
+\begin{itemize}
+    \item How does argv split the shell command by space? strtok?
+    \item Are local variables exclusively stored in call-clobbered registers?
+    \item Need to understand extern at asm level. Is it still stored at BSS?
+\end{itemize}
+valgrind --tool=memcheck --leak-check=full
+
+\section{Linux/Unix Fundamentals}
+\subsection{Filesystems}
+\begin{itemize}
+    \item Operating Systems deploy many types of filesystems based on purpose they serve and hardware deployed on
+    \item Examples:
+    \begin{itemize}
+        \item CDFS and UDF for CD's and DVD's (read only media)
+        \item FAT Legacy filesystem originally meant for floppy disks
+        \item TMPFS filesystem implemented in RAM (often used in booting up)
+        \item NTFS (Windows) HFS+ (Apple)
+        \item EXT4 Most Common Linux Journaled Filesystem
+        \item ZFS The Zetabyte filesystem. Can create a FS on a huge set of drives
+        \item MFS The Media Filesystem on Tivo DVRs
+    \end{itemize}
+\end{itemize}
+
+\subsection{UFS}
+\begin{itemize}
+    \item UFS: Unix filesystem (Bell Labs)
+\end{itemize}
+Several types' of files
+\begin{itemize}
+    \item Most basic kind: ``ordinary" file
+    \begin{itemize}
+        \item No internal organizations, just a sequence of bytes
+        \item No byte has any inherent significance, no EOF byte
+    \end{itemize}
+    \item Every file has a unique inode number. An inode is a data structure that contains the metadata (file type and block list) about a file. The number identifies the associated inode
+    \item inode contains: length of file, owner id, group id, timestamps, permissions, type, list of disk blocks, etc.
+    \item The inode number is just an index in an array that stores files
+\end{itemize}
+Disk Layout (INODE DATABLOCKS)
+\begin{itemize}
+    \item Boot Block has room for bytes that firmware can read to start the boot process
+    \item Superblock has parameters: how many blocks on disk, how many inodes, etc.
+    \item Following the Super Block, more blocks (inode blocks)
+\end{itemize}
+\subsubsection{Another Type of File: Directories}
+The Inodes form a physical directory of the disk. But the inodes contain no names or hierarchy. Files are just numbers
+\begin{itemize}
+    \item Directory is another file type
+    \item Like an ordinary file its a series of bytes stored in data blocks and has an inode. However, it has a structure. It is a sequence of directory entries.
+    \item A directory entry is just a pair: \textbf{(name. Inode\#)}
+    \item There is a special directory called the root (``/", 2). It always has inode number 2
+\end{itemize}
+
+\subsubsection{Paths}
+A path name starting with `/' is an absolute path name, and traverses the file tree from the root
+\begin{itemize}
+    \item If there are N disk reads, it will take $2 \cdot n$ disk reads to get to the desired path. Must read N data blocks + N directories or inodes
+    \item There are two special directory entries in each directory ``." the current directory and ``.." the parent directory
+    \item OS keeps track of your current working directory (CWD) and paths not starting with a ``/" are relative path names and start at the CWD
+    \item The $2N$ expense is mitigated by using relative paths and the Name Cache
+\end{itemize}
+\subsubsection{Links}
+\begin{itemize}
+    \item From a first glance, the filesystem forms a tree, turns out that is inconvenient. There are several reasons to have more than one path to the same file. Why? Three example reasons:
+    \begin{itemize}
+        \item A binary program may have a file path compiled in that is not where the file lives on a given system
+        \item Absolute path names can be very long
+        \item Two programmers may need header files that are always consistent
+    \end{itemize}
+    \item The shell command: ln \{oldpath\} \{newpath\} creates a newpath with the same inode\# as oldpath
+    \begin{itemize}
+        \item By default creates hard-link
+        \item `-s' flag added, creates soft link instead
+    \end{itemize}
+    \item This required adding an additional field to the inode ``nlinks" (link count) which increments whenever a new path is linked to its inode
+    \item When a file is deleted its directory entry is deleted and nlinks is decremented. Actual inode and data blocks cannot be released until nlinks is 0. NOTE: nlinks does NOT contain symlinks/soft links count
+    \begin{itemize}
+        \item When nlinks reaches 0, the remaining softlinks still keep their path data, it will just complaint that path does not exist
+    \end{itemize}
+    \item Normally directories cannot be linked, since this could create a cycle in the filesystem graph (no long a tree). There is an exception for the superuser
+\end{itemize}
+Mounts
+\begin{itemize}
+    \item Windows handles multiple disks by creating a forest (separate trees)
+    \item Generically: \% mount \{newdisk-dev\} \{path-to-existing-directory\}
+    \item In these forests, inodes may link to different files in directory entries, violating a core property of hard links (i.e. hard links won't work). Symbolic Links (soft link) are meant to solve this
+\end{itemize}
+Symbolic Links
+\begin{itemize}
+    \item The links described earlier are ``hard" links
+    \begin{itemize}
+        \item All path names have the same inode number
+        \item No path is any more primary than any other
+    \end{itemize}
+    \item Hard links cannot be used across filesystems since each filesystem has its own inodes, and the inode numbers are not related
+    \item A symbolic link is a new file type (our 3rd in this class). Like other file types, it has an inode, however, its data is just a pathname to another file (NOT THE INODE)
+    \begin{itemize}
+        \item If you rm the file and create a new file with same name under different inode, symbolic link will point to that new file
+    \end{itemize}
+    \item When the OS tries to open a symbolic link, it just starts again with the pathname in the data of the symbolic link
+    \item \textbf{Can be used between filesystems}
+    \item Syntax: ln -s \{oldpath\} \{newpath\}
+    \item capital L flag in ls follows soft link
+\end{itemize}
+Block List
+\begin{itemize}
+    \item UFS employs block list with 15 entries (specific to UFS, xv4 has this too but with addons, which won't be covered)
+    \item First 12 are DIRECT data block numbers
+    \item Entry 13 is block number of an INDIRECT block
+    \begin{itemize}
+        \item An INDIRECT BLOCK contains BS/4 data block numbers
+    \end{itemize}
+    \item Entry 14 is a block number of an DOUBLY INDIRECT block
+    \begin{itemize}
+        \item A DOUBLY INDIRECT BLOCK contains BS/4 block numbers of INDIRECT blocks
+    \end{itemize}
+    \item Entry 15 is a block number of a TRIPLY INDIRECT block
+    \begin{itemize}
+        \item A TRIPLY INDIRECT BLOCK contains BS/4 block numbers of DOUBLY INDIRECT blocks
+    \end{itemize}
+    \item Note: BS/4 means block size divided by 4
+    \item 256 data blocks from an indirect block, assuming BS = 1024
+    \item Data Covered
+    \begin{itemize}
+        \item Direct: 12 * BS
+        \item Indirect: $BS^2 / 4$
+        \item Doubly indirect: $BS^3 / 16$
+        \item Triply Indirect: $BS^4 / 64$
+        \item Each state for indirect, multiply by $BS/4$
+    \end{itemize}
+\end{itemize}
+\subsection{Special Files}
+Special Files
+\begin{itemize}
+    \item So far we only have three file types (ordinary, directory, soft link)
+    \item With creation of Unix and predecessor Multics, the idea emerged about unifying the disk file API with an API for hardware devices
+    \item Introducing special files.
+    \begin{itemize}
+        \item Files not connected to disk files on the filesystem
+        \item Right now, we will talk about ``special device files" (deal with hardware)
+    \end{itemize}
+    \item Special device files deal with input/output with hardware
+\end{itemize}
+Special Device Files
+\begin{itemize}
+    \item Have paths in the filesystem like ordinary files or directories
+    \item Special device files have inodes just as ordinary files or directories
+    \item Those inodes have the usual owner, group, permission, timestamp, ...
+    \item Those inodes have no block list. Instead they have fields (with 2 types)
+    \begin{itemize}
+        \item Type: Block or Character
+        \item Major number (an index into an array of device drivers)
+        \item Minor number (an instance number for multiple devices using the same driver)
+    \end{itemize}
+\end{itemize}
+Block Device Files
+\begin{itemize}
+    \item They are modeled after devices that act like disks
+    \item Read and Write is done in fixed sized blocks
+    \item Data is transferred between device and the ``\textbf{buffer cache}"
+    \begin{itemize}
+        \item Buffer Cache is an area of memory inside the BSS (global uninitialized) of the kernel itself
+    \end{itemize}
+    \item User program reads and writes from/to the BUFFER CACHE
+    \begin{itemize}
+        \item Multiple programs can read/write from/ to the BUFFER cache without having to do multiple transfers from/to the device
+        \item Programs can read/write smaller amounts than the device block size. The OS just gives them what they need from the cache
+        \item An opportunity for Read Ahead, Write Behind
+        \begin{itemize}
+            \item Read ahead: read more blocks than the application asked for, hoping the others will be used too
+            \item Write-behind: delay writes, try to group them for improved disk performance (fewer seeks)
+            \item Interacts with caching
+        \end{itemize}
+        \item https://www.cs.cornell.edu/courses/cs415/1999fa/slides-fs/text40.htm
+        \item Sharing buffer cache can be good, because it can overwrite  data
+    \end{itemize}
+\end{itemize}
+Character Device File
+\begin{itemize}
+    \item Modeled after a terminal device, but serves many types of devices (scanners, printers, etc.)
+    \item Data is private and only read once
+    \item Read/Writes of variable size from single byte to larger buffer
+    \item Reads/Writes bypass buffer cache (only reads once) and go directly to the device
+    \item Supports DMA (direct memory access) devices, where the device can transfer data to and from memory with the computers CPU assistance. Directly from BSS
+    \item Some devices have both block and character device files
+\end{itemize}
+Device files go in /dev
+\begin{itemize}
+    \item b or c in ls -l flag
+    \item device driver number and minor number are shown in ls
+    \item pts directory shows terminals (character device files)
+    \item tty shows cwd for terminal
+\end{itemize}
+We now have 5 types of files
+
+\subsection{Programs and Processes}
+Compiled Programs reside in filesystem
+\begin{itemize}
+    \item The file has execute permission
+    \item They conform to ELF format (Executable and Linkable Format)
+    \begin{itemize}
+        \item They start with a MAGIC \# that defines the architecture of the binary
+        \item There is a header that defines the sizes and offsets of the sections that follow
+        \begin{itemize}
+            \item Text, Data, BSS, Symbols (optional)
+        \end{itemize}
+    \end{itemize}
+    \item A process is created when a compiled program is executed
+    \begin{itemize}
+        \item The OS creates a private address space for the process
+        \item Loads the contents of the ELF file (Text, Data, BSS) into the address space
+        \item Initializes the stack and SP with argv, and sets the PC to main
+        \item Initializes the UBLOCK (Unix term for the PCB, process control block)
+    \end{itemize}
+\end{itemize}
+UBLOCK
+\begin{itemize}
+    \item A process is a wrapper for a running program and all the resources it is using
+    \item UBLOCK has the tables and data the OS needs to provide service to the process on those resources
+    \begin{itemize}
+        \item UID, GID, PID, PPID, CPU time so far, CWD, file table, signal table, ...
+        \item Save areas for context switch
+    \end{itemize}
+    \item UBLOCK is located in the address space above the STACK, and is not directly accessible to the process
+    \item The kernel has a process table in its BSS, which is an array of pointers to all the UBLOCKS.
+    \item The RQ (Run Queue) is a Queue of all the processes waiting to run. There are WAIT Queues for process waiting for an event
+\end{itemize}
+System Interface
+\begin{itemize}
+    \item Interface to the Kernel is via system calls
+    \begin{itemize}
+        \item System calls are written in assembler and make use of a ``trap" instruction
+        \item Trap instruction sets the PC to the address of a syscall handler in the kernel, and puts the CPU into privileged mode
+        \item The syscall handler looks back at the stack of the process invoking the trap and decodes the parameters that define the request
+        \item If the request is valid the kernel satisfies the request
+        \item If the request is valid the kernel satisfies the request using information in the UBLOCK and then returns to process in non-privileged mode
+    \end{itemize}
+\end{itemize}
+Support Files
+\begin{itemize}
+    \item C CANNOT issue system calls. System calls are OS dependent and C can work with any OS
+    \item C uses a library, the C library libc (or glibc) which has the assembly routines for the system calls on that platform. Documented in man pages
+    \item System header files are in a tree starting at /usr/include
+\end{itemize}
